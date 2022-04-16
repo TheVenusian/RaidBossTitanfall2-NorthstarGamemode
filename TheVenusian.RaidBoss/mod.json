@@ -1,7 +1,7 @@
 {
     "Name" : "TheVenusian.RaidBoss",
     "Description" : "A Raid Boss gamemode",
-    "Version": "0.6.1",
+    "Version": "0.6.2",
     "RequiredOnClient": true,
     "LoadPriority": 1,
     "Scripts": [

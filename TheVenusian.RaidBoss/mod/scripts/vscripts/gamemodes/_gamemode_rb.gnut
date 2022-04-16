@@ -29,6 +29,7 @@ void function RaidBoss_init(){
     }
 
   void function StartGame(){
+    SetTeam( GetPlayerArray()[GetPlayerArray().len()], TEAM_MILITIA)
     RaidBossPlayer = GetPlayerArray()[RandomInt(GetPlayerArray().len())]
     SetTeam( RaidBossPlayer, TEAM_IMC)
     file.HasStarted = true
@@ -41,7 +42,7 @@ void function PlayerJoined(entity player){
 void function ModifyPilots( entity player )
 {
   if ( player.GetTeam() == TEAM_IMC ){
-    thread SpawnRaidBoss(RaidBossPlayer)
+     SpawnRaidBoss(RaidBossPlayer)
     if ( GetCurrentPlaylistVarInt( "rb_enableannouncements", 1 ) == 1 ){
         Remote_CallFunction_NonReplay( player, "ServerCallback_RaidBoss" ) // call the function that will be used client-side
     }
