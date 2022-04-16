@@ -1,0 +1,56 @@
+ global function rb_init // initializing functions
+ 
+    global const string GAMEMODE_RAIDBOSS = "rb" 
+    
+    
+    void function rb_init()
+    {
+        // start defining what to do before the map loads on this gamemode
+	AddCallback_OnCustomGamemodesInit( CreateGamemodeRaidBoss ) // define various properties such as name, desc, so on
+	AddCallback_OnRegisteringCustomNetworkVars( RbRegisterNetworkVars ) // server callbacks stuff
+    }
+    void function CreateGamemodeRaidBoss()
+    {
+	GameMode_Create( GAMEMODE_RAIDBOSS )
+	GameMode_SetName( GAMEMODE_RAIDBOSS, "#GAMEMODE_RAIDBOSS" ) 
+	GameMode_SetDesc( GAMEMODE_RAIDBOSS, "#PL_rb_desc" )
+	GameMode_SetDefaultTimeLimits( GAMEMODE_RAIDBOSS, 10, 0.0 ) // a time limit of 10 minutes
+	GameMode_AddScoreboardColumnData( GAMEMODE_RAIDBOSS, "#SCOREBOARD_SCORE", PGS_ASSAULT_SCORE, 2 ) // dont fuck with it
+	GameMode_AddScoreboardColumnData( GAMEMODE_RAIDBOSS, "#SCOREBOARD_PILOT_KILLS", PGS_PILOT_KILLS, 2 ) // dont fuck with it
+    GameMode_SetColor( GAMEMODE_RAIDBOSS, [147, 204, 57, 255] ) // dont fuck with it
+    
+	AddPrivateMatchMode( GAMEMODE_RAIDBOSS ) // add to private lobby modes
+
+    AddPrivateMatchModeSettingEnum("#MODE_SETTING_CATEGORY_RAIDBOSS", "#MODE_SETTING_ENABLE_ANNOUNCEMENTS", ["#SETTING_DISABLED", "#SETTING_ENABLED"], "1")
+    //creates a togglable riff whether or not we want to announce a text to the client
+    AddPrivateMatchModeSettingArbitrary("#MODE_SETTING_CATEGORY_RAIDBOSS", "#MODE_SETTING_BOSS_HEALTH_MULTIPLIER", "5")
+    //adds boss health multiplier
+    AddPrivateMatchModeSettingArbitrary("#MODE_SETTING_CATEGORY_RAIDBOSS", "#MODE_SETTING_PLAYER_HEALTH_MULTIPLIER", "3")
+    //adds player health multiplier 
+ 
+    GameMode_SetDefaultScoreLimits( GAMEMODE_RAIDBOSS, 1, 0 )
+   #if SERVER
+		GameMode_AddServerInit( GAMEMODE_RAIDBOSS, RaidBoss_init ) // server side initalizing function
+		GameMode_SetPilotSpawnpointsRatingFunc( GAMEMODE_RAIDBOSS, RateSpawnpoints_Generic )
+		GameMode_SetTitanSpawnpointsRatingFunc( GAMEMODE_RAIDBOSS, RateSpawnpoints_Generic )
+                // until northstar adds more spawnpoints algorithm, we are using the default.
+	#elseif CLIENT
+		GameMode_AddClientInit( GAMEMODE_RAIDBOSS, ClGamemodeRb_Init ) // client side initializing function
+	#endif
+    
+	#if !UI
+		GameMode_SetScoreCompareFunc( GAMEMODE_RAIDBOSS, CompareAssaultScore ) 
+                // usually compares which team's score is higher and places the winning team on top of the losing team in the scoreboard
+	#endif
+    }
+    
+    
+    void function RbRegisterNetworkVars()
+    {
+	if ( GAMETYPE != GAMEMODE_RAIDBOSS )
+		return
+        
+	Remote_RegisterFunction( "ServerCallback_RaidBoss" )
+        // will come in useful later when we want the server to communicate to the client
+        // for example, making an announcement appear on the client
+    }

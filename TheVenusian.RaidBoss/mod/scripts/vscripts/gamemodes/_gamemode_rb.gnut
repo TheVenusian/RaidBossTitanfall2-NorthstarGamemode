@@ -1,0 +1,125 @@
+untyped
+
+global function RaidBoss_init
+entity RaidBossPlayer
+entity Pilots
+
+ struct {
+    bool HasStarted = false
+    float Raid_boss_hp_multiplier
+    float Player_hp_multiplier
+} file
+
+void function RaidBoss_init(){
+
+    SetSpawnpointGamemodeOverride( FFA )
+    SetLoadoutGracePeriodEnabled( false )
+    SetWeaponDropsEnabled(false )
+    SetRespawnsEnabled( false )
+    GetCurrentPlaylistVarFloat( "earn_meter_titan_multiplier", 0.0)
+    GetCurrentPlaylistVarInt( "aegis_upgrades", 1)
+    Riff_ForceTitanExitEnabled( eTitanExitEnabled.Never )
+    ClassicMP_ForceDisableEpilogue( true )
+    AddCallback_OnClientConnected( PlayerJoined )
+    AddCallback_GameStateEnter( eGameState.Playing, StartGame )
+    SetTimeoutWinnerDecisionFunc( DecideWinners )
+    AddCallback_OnPlayerRespawned( ModifyPilots )
+    file.Raid_boss_hp_multiplier = GetCurrentPlaylistVarFloat( "#MODE_SETTING_BOSS_HEALTH_MULTIPLIER", 5 )
+    file.Player_hp_multiplier = GetCurrentPlaylistVarFloat( "#MODE_SETTING_PLAYER_HEALTH_MULTIPLIER", 3 )
+    }
+
+  void function StartGame(){
+    RaidBossPlayer = GetPlayerArray()[RandomInt(GetPlayerArray().len())]
+    SetTeam( RaidBossPlayer, TEAM_IMC)
+    file.HasStarted = true
+}
+
+void function PlayerJoined(entity player){
+    SetTeam( player, TEAM_MILITIA)
+}
+
+void function ModifyPilots( entity player )
+{
+  if ( player.GetTeam() == TEAM_IMC ){
+    thread SpawnRaidBoss(RaidBossPlayer)
+    if ( GetCurrentPlaylistVarInt( "rb_enableannouncements", 1 ) == 1 ){
+        Remote_CallFunction_NonReplay( player, "ServerCallback_RaidBoss" ) // call the function that will be used client-side
+    }
+ }
+    if ((GetPlayerArrayOfTeam(TEAM_MILITIA).len()) == 0){
+        SetRespawnsEnabled(false)
+        SetKillcamsEnabled(false)
+        SetWinner( TEAM_IMC )
+ 
+    if (player.GetTeam() == TEAM_MILITIA){
+    // Modify player weapons, health, etc. 
+    player.SetMaxHealth(player.GetMaxHealth() * file.Player_hp_multiplier)
+    
+
+        
+        }
+     }
+ }
+
+void function SpawnRaidBoss( entity player )
+{
+	player.Signal( "PlayerRespawnStarted" )
+
+	player.isSpawning = true
+	entity spawnpoint = FindSpawnPoint( player, true, ( ShouldStartSpawn( player ) || Flag( "ForceStartSpawn" ) ) && !IsFFAGame() )
+
+	TitanLoadoutDef titanLoadout = GetTitanLoadoutForPlayer( player )
+
+	asset model = GetPlayerSettingsAssetForClassName( titanLoadout.setFile, "bodymodel" )
+	Attachment warpAttach = GetAttachmentAtTimeFromModel( model, "at_hotdrop_01", "offset", spawnpoint.GetOrigin(), spawnpoint.GetAngles(), 0 )
+	PlayFX( TURBO_WARP_FX, warpAttach.position, warpAttach.angle )
+		
+	entity titan = CreateAutoTitanForPlayer_FromTitanLoadout( player, titanLoadout, spawnpoint.GetOrigin(), spawnpoint.GetAngles() )
+	DispatchSpawn( titan )
+	player.SetPetTitan( null ) // prevent embark prompt from showing up
+	
+	AddCinematicFlag( player, CE_FLAG_CLASSIC_MP_SPAWNING ) // hide hud
+	
+	// do titanfall scoreevent
+	AddPlayerScore( player, "Titanfall", player )
+	
+	entity camera = CreateTitanDropCamera( spawnpoint.GetAngles(), < 90, titan.GetAngles().y, 0 > )
+	camera.SetParent( titan )
+	
+	// calc offset for spawnpoint angle
+	// todo this seems bad but too lazy to figure it out rn
+	//vector xyOffset = RotateAroundOrigin2D( < 44, 0, 0 >, < 0, 0, 0>, spawnpoint.GetAngles().y )
+	//xyOffset.z = 520 // < 44, 0, 520 > at 0,0,0, seems to be the offset used in tf2
+	//print( xyOffset )
+	
+	vector xyOffset = RotateAroundOrigin2D( < 44, 0, 520 >, < 0, 0, 0 >, spawnpoint.GetAngles().y )
+	
+	camera.SetLocalOrigin( xyOffset )
+	camera.SetLocalAngles( < camera.GetAngles().x, spawnpoint.GetAngles().y, camera.GetAngles().z > ) // this straight up just does not work lol
+	camera.Fire( "Enable", "!activator", 0, player )
+	
+	player.EndSignal( "OnDestroy" )
+	OnThreadEnd( function() : ( player, titan, camera )
+	{
+		if ( IsValid( player ) )
+		{
+			RemoveCinematicFlag( player, CE_FLAG_CLASSIC_MP_SPAWNING ) // show hud
+			player.isSpawning = false
+		}
+	
+		titan.Destroy() // pilotbecomestitan leaves an npc titan that we need to delete
+		camera.Fire( "Disable", "!activator", 0, player )
+		camera.Destroy()
+	})
+    
+    //modifiers
+    RaidBossPlayer.SetMaxHealth( player.GetMaxHealth() * file.Raid_boss_hp_multiplier ) //give boss more health
+
+}
+
+
+ int function DecideWinners(){
+  SetRespawnsEnabled( false )
+  SetKillcamsEnabled( false )
+  return TEAM_UNASSIGNED // draws the game
+}
